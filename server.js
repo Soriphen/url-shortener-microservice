@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
+const { nanoid } = require("nanoid");
 const cors = require("cors");
 const app = express();
 var bodyParser = require("body-parser");
@@ -17,7 +18,7 @@ let { Schema, model } = mongoose;
 
 let urlSchema = new Schema({
   original: { type: String, required: true },
-  short: Number
+  short: String
 });
 let Url = model("Url", urlSchema);
 
@@ -25,7 +26,7 @@ app.use(cors());
 
 app.use("/public", express.static(`${process.cwd()}/public`));
 
-app.get("/", function (req, res) {
+app.get("/", function(req, res) {
   res.sendFile(process.cwd() + "/views/index.html");
 });
 
@@ -41,34 +42,22 @@ app.post(
       inputUrl = req.body["url"]; // Capture original url inputted
       responseObject["original_url"] = inputUrl;
 
-      inputShort = 1;
+      inputShort = nanoid();
 
-      Url.findOne({}) // Empty object means all documents in a collection are selected but only the first document (in this case the one with the highest short value) is returned
-        .sort({ short: "desc" }) // First finds document with highest short value
-        .exec((error, result) => {
-          try {
-            if (result != undefined || result != null) {
-              // != is used instead of !== because !== would evaluate to true due to the type of result not equaling the type of null, despite the fact that the values do equal each other
-              // If a document exists, increment the short value
-              inputShort = result.short + 1;
-            }
-            Url.findOneAndUpdate(
-              { original: inputUrl },
-              { original: inputUrl, short: inputShort },
-              { upsert: true, new: true }, // upsert will create a document if it doesn't exist and new will return the changed document
-              (error, savedUrl) => {
-                try {
-                  responseObject["short_url"] = savedUrl.short;
-                  res.json(responseObject);
-                } catch (error) {
-                  return console.log(error.message);
-                }
-              }
-            );
-          } catch (error) {
-            return console.log(error.message);
+      Url.findOneAndUpdate(
+        { original: inputUrl },
+        { original: inputUrl, short: inputShort },
+        { upsert: true, new: true })
+        .then((savedUrl) => {
+          if (savedUrl === null || savedUrl === undefined) {
+            throw new Error("savedUrl is undefined");
           }
-        });
+          responseObject["short_url"] = savedUrl.short;
+          res.json(responseObject);
+        }).catch((error) => {
+          console.log(error.message)
+        })
+        
     } else if (!validator.isURL(req.body["url"])) {
       responseObject["error"] = "invalid URL";
       res.json(responseObject);
@@ -91,6 +80,6 @@ app.get("/api/shorturl/:input", (req, res) => {
   });
 });
 
-app.listen(port, function () {
+app.listen(port, function() {
   console.log(`Listening on port ${port}`);
 });
