@@ -43,20 +43,23 @@ app.post(
       responseObject["original_url"] = inputUrl;
 
       inputShort = nanoid();
-
+      
       Url.findOneAndUpdate(
-        { original: inputUrl },
-        { original: inputUrl, short: inputShort },
-        { upsert: true, new: true })
-        .then((savedUrl) => {
-          if (savedUrl === null || savedUrl === undefined) {
-            throw new Error("savedUrl is undefined");
-          }
-          responseObject["short_url"] = savedUrl.short;
-          res.json(responseObject);
-        }).catch((error) => {
-          console.log(error.message)
-        })
+      { original: inputUrl },
+      { original: inputUrl, short: inputShort },
+      { upsert: true, new: true }, 
+      (error, savedUrl) => {
+        if (!savedUrl) {
+          throw new Error("savedUrl is undefined");
+        }
+
+        if (error) {
+          return console.log(error.message)
+        }
+        
+        responseObject["short_url"] = savedUrl.short;
+        res.json(responseObject);
+      })   
         
     } else if (!validator.isURL(req.body["url"])) {
       responseObject["error"] = "invalid URL";
